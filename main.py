@@ -7,7 +7,7 @@ import matplotlib as mpl
 from matplotlib.ticker import MaxNLocator
 from matplotlib import rc
 import matplotlib.ticker as mtick
-plt.rcParams.update({'font.size': 14})
+plt.rcParams.update({'font.size': 18})
 rc('font',**{'family':'sans-serif','sans-serif':['Helvetica']})
 rc('text', usetex=False)
 
@@ -95,26 +95,27 @@ def pdr_computation(df):
 def plots():
     df_dsrc_pdr, df_dsrc_delay = read_data_cv2x()
     df_cv2x_pdr, df_cv2x_delay  = read_data_dsrc()
+    df_pdr_merged = pd.merge(df_dsrc_pdr, df_cv2x_pdr, on='Distance', how='outer').replace(np.nan, 0).reset_index()
 
-
-
-
-
-def plot_pdr(df_dsrc, df_cv2x):
-    fig, ax = plt.subplots(figsize=(6, 4))
-    df.plot.bar(y="mean", yerr="std", color='w', hatch='x',
-                      label='C-V2X', ax=ax, edgecolor='black')
+    # Subplots with several columns
+    ax = df_pdr_merged.plot(position=1,x="Distance", color='b', y="mean_x", yerr="std_x",  hatch='xx',
+                      label='3GPP C-V2X', kind="bar", edgecolor='black',width=0.4,)
+    df_pdr_merged.plot( position=0,x="Distance", color='r', y="mean_y",yerr="std_y",  hatch='oo',
+                           label='IEEE802.11p', kind="bar", ax=ax, edgecolor='black',width=0.4,)
     plt.xticks(rotation=360)
     ax.set_ylabel('PDR [%]')
     ax.set_xlabel('Distance [m]')
-    fig.tight_layout()
+    #ax.set_xticks([100,200,300,400,500,600,700,800])
+    plt.xlim(-1, 8)
+    #fig.tight_layout()
     plt.show()
+
 
 def delay_plot(df):
     df = df.groupby("Distance").agg([np.mean, np.std])
     df_delay = df['Delay']
 
-    fig, ax = plt.subplots(figsize=(6, 4))
+
     df_delay.plot.bar(y="mean", yerr="std", color='w',hatch='x',
                    label='C-V2X', ax=ax, edgecolor='black')
 
@@ -241,4 +242,4 @@ def single_plot(folders, df):
     #fig.savefig(fig_folder)
 
 
-
+plots()
