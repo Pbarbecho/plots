@@ -12,9 +12,51 @@ rc('font',**{'family':'sans-serif','sans-serif':['Helvetica']})
 rc('text', usetex=False)
 
 
-def read_data():
-    "Read data coming from OMNET simulations and build dataframes"
+def filter_by_distance(df):
+    space = 100 # distance space in x axis
+    max_distance = 2000 # max distance of rrx message
+    iterations = max_distance / space
+    distances_df = pd.DataFrame()
+    for iter in range(int(iterations)):
+        df_temp = df[df.DistanceToBS.between(left=iter * space, right=iter * space + space)]
+        df_temp['Distance'] = iter * space + space
+        df_temp['PDR'] = ( df_temp.Nodeid_x.count()/ df_temp.Nodeid_y.count() ) * 100
+        distances_df = pd.concat([df_temp, distances_df], ignore_index=True)
+    return distances_df
 
+def read_data_dsrc():
+    tx = "/Users/Pablo/Documentos/INFORME/dsrc/car_sender.csv"
+    tx_columns = [ 'Nodeid','msgId','Creation_Time','Bit_Length','DistanceToBS','Tx_Time']
+    df_tx = pd.read_csv(tx, names=tx_columns)
+
+
+    rx = "/Users/Pablo/Documentos/INFORME/dsrc/server_receiver.csv"
+    rx_columns = ['Nodeid','msgId','Creation_Time','Bit_Length','Rx_Time']
+    df_rx = pd.read_csv(rx, names=rx_columns)
+    df_rx['Delay'] = (df_rx['Rx_Time'] - df_rx['Creation_Time']) * 1000  # compute msg delay (ms)
+
+    # Filter data
+    tx_filter_metrics = ['Nodeid', 'msgId', 'DistanceToBS']
+    tx_fitered_df = df_tx.filter(items=tx_filter_metrics)
+
+    rx_filter_metrics = ['Nodeid', 'msgId', 'Delay']
+    rx_fitered_df = df_rx.filter(items=rx_filter_metrics)
+
+    df_merged = pd.merge(rx_fitered_df, tx_fitered_df, on='msgId', how='outer')
+
+    # pdr
+    df_filtered_dist = filter_by_distance(df_merged)
+    df_pdr = pdr_computation(df_filtered_dist)
+
+    # delay
+    df_merged.dropna(inplace=True)
+    df_delay = filter_by_distance(df_merged)
+
+    return df_pdr,df_delay
+
+
+def read_data_cv2x():
+    "Read data coming from OMNET simulations and build dataframes"
     tx = "/Users/Pablo/Desktop/INFORME/car_sender.csv"
     tx_columns = [ 'Dir','Nodeid','SrcId','DstId','msgId','Creation_Time','N_Frame','FrameId','Dst_Port','Size','DistanceToBS']
     df_tx = pd.read_csv(tx, names=tx_columns)
@@ -31,29 +73,49 @@ def read_data():
     rx_filter_metrics = ['Nodeid','o_Treeid','Delay']
     rx_fitered_df = df_rx.filter(items=rx_filter_metrics)
 
-    #rx_fitered_df.to_csv('/Users/Pablo/Desktop/INFORME/Filtered/rx_filtered.csv')
     #tx_fitered_df.to_csv('/Users/Pablo/Desktop/INFORME/Filtered/tx_filtered.csv')
-
     df_merged = pd.merge(rx_fitered_df, tx_fitered_df, left_on='o_Treeid',right_on='msgId', how='outer')
+    # pdr
+    df_filtered_dist = filter_by_distance(df_merged)
+    df_pdr = pdr_computation(df_filtered_dist)
 
-    space = 100
-    max_distance = 1500
-    iterations = max_distance/space 
-    distances_df = pd.DataFrame()
-    for iter in range(int(iterations)):
-        df_temp = df_merged[df_merged.DistanceToBS.between(left=iter*space, right=iter*space+space)]
-        df_temp['Distance'] = iter*space+space
-        distances_df = pd.concat([df_temp, distances_df], ignore_index=True)
-    #distances_df.to_csv('/Users/Pablo/Desktop/INFORME/Filtered/filtered.csv')
-    return distances_df
+    # delay
+    df_merged.dropna(inplace=True)
+    df_delay = filter_by_distance(df_merged)
+
+    return df_pdr,df_delay
 
 
-def prepare_plot(df):
+def pdr_computation(df):
     df = df.groupby("Distance").agg([np.mean, np.std])
-    df = df['Delay']
+    df = df['PDR']
+    return df
+
+
+def plots():
+    df_dsrc_pdr, df_dsrc_delay = read_data_cv2x()
+    df_cv2x_pdr, df_cv2x_delay  = read_data_dsrc()
+
+
+
+
+
+def plot_pdr(df_dsrc, df_cv2x):
+    fig, ax = plt.subplots(figsize=(6, 4))
+    df.plot.bar(y="mean", yerr="std", color='w', hatch='x',
+                      label='C-V2X', ax=ax, edgecolor='black')
+    plt.xticks(rotation=360)
+    ax.set_ylabel('PDR [%]')
+    ax.set_xlabel('Distance [m]')
+    fig.tight_layout()
+    plt.show()
+
+def delay_plot(df):
+    df = df.groupby("Distance").agg([np.mean, np.std])
+    df_delay = df['Delay']
 
     fig, ax = plt.subplots(figsize=(6, 4))
-    df.plot.bar(y="mean", yerr="std", color='w',hatch='x',
+    df_delay.plot.bar(y="mean", yerr="std", color='w',hatch='x',
                    label='C-V2X', ax=ax, edgecolor='black')
 
     plt.xticks(rotation=360)
@@ -178,5 +240,5 @@ def single_plot(folders, df):
     #fig_folder = "/Users/Pablo/Desktop/plot.pdf"
     #fig.savefig(fig_folder)
 
-df = read_data()
-prepare_plot(df)
+
+
