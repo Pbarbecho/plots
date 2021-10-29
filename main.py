@@ -14,7 +14,7 @@ rc('text', usetex=False)
 
 def filter_by_distance(df):
     space = 100 # distance space in x axis
-    max_distance = 2000 # max distance of rrx message
+    max_distance = 500 # max distance of rrx message
     iterations = max_distance / space
     distances_df = pd.DataFrame()
     for iter in range(int(iterations)):
@@ -45,23 +45,27 @@ def read_data_dsrc():
     df_merged = pd.merge(rx_fitered_df, tx_fitered_df, on='msgId', how='outer')
 
     # pdr
-    df_filtered_dist = filter_by_distance(df_merged)
-    df_pdr = pdr_computation(df_filtered_dist)
+    df_pdr_filtered_dist = filter_by_distance(df_merged)
+    df_pdr = filter_group(df_pdr_filtered_dist, 'PDR')
 
     # delay
     df_merged.dropna(inplace=True)
-    df_delay = filter_by_distance(df_merged)
+    df_delay_filtered_dist = filter_by_distance(df_merged)
+    df_delay = filter_group(df_delay_filtered_dist, 'Delay')
 
+    print('DSRC Mean Delay:', df_delay['mean'].mean())
+    print('DSRC Mean PDR:', df_pdr['mean'].mean())
+    print('DSRC STD PDR:', df_pdr['std'].mean())
     return df_pdr,df_delay
 
 
 def read_data_cv2x():
     "Read data coming from OMNET simulations and build dataframes"
-    tx = "/Users/Pablo/Desktop/INFORME/car_sender.csv"
+    tx = "/Users/Pablo/Documentos/INFORME/cv2x/car_sender.csv"
     tx_columns = [ 'Dir','Nodeid','SrcId','DstId','msgId','Creation_Time','N_Frame','FrameId','Dst_Port','Size','DistanceToBS']
     df_tx = pd.read_csv(tx, names=tx_columns)
 
-    rx = "/Users/Pablo/Desktop/INFORME/server_receiver.csv"
+    rx = "/Users/Pablo/Documentos/INFORME/cv2x/server_receiver.csv"
     rx_columns = ['Dir', 'Nodeid', 'TxId', 'RxId', 'msgId', 'o_Treeid', 'Creation_Time', 'Curr_Time', 'FrameId']
     df_rx = pd.read_csv(rx, names=rx_columns)
     df_rx['Delay'] = (df_rx['Curr_Time'] - df_rx['Creation_Time']) * 1000  # compute msg delay (ms)
@@ -75,20 +79,24 @@ def read_data_cv2x():
 
     #tx_fitered_df.to_csv('/Users/Pablo/Desktop/INFORME/Filtered/tx_filtered.csv')
     df_merged = pd.merge(rx_fitered_df, tx_fitered_df, left_on='o_Treeid',right_on='msgId', how='outer')
+
     # pdr
-    df_filtered_dist = filter_by_distance(df_merged)
-    df_pdr = pdr_computation(df_filtered_dist)
+    df_pdr_filtered_dist = filter_by_distance(df_merged)
+    df_pdr = filter_group(df_pdr_filtered_dist, 'PDR')
 
     # delay
     df_merged.dropna(inplace=True)
-    df_delay = filter_by_distance(df_merged)
-
+    df_delay_filtered_dist = filter_by_distance(df_merged)
+    df_delay = filter_group(df_delay_filtered_dist, 'Delay')
+    print('CV2X Mean Delay:', df_delay['mean'].mean())
+    print('CV2X Mean PDR:', df_pdr['mean'].mean())
+    print('CV2X STD PDR:', df_pdr['std'].mean())
     return df_pdr,df_delay
 
 
-def pdr_computation(df):
+def filter_group(df, name_filter):
     df = df.groupby("Distance").agg([np.mean, np.std])
-    df = df['PDR']
+    df = df[name_filter]
     return df
 
 
@@ -96,8 +104,10 @@ def plots():
     df_dsrc_pdr, df_dsrc_delay = read_data_cv2x()
     df_cv2x_pdr, df_cv2x_delay  = read_data_dsrc()
     df_pdr_merged = pd.merge(df_dsrc_pdr, df_cv2x_pdr, on='Distance', how='outer').replace(np.nan, 0).reset_index()
+    df_delay_merged = pd.merge(df_dsrc_delay, df_cv2x_delay, on='Distance', how='outer').replace(np.nan, 0).reset_index()
 
-    # Subplots with several columns
+
+    # Subplots PDR with several columns
     ax = df_pdr_merged.plot(position=1,x="Distance", color='b', y="mean_x", yerr="std_x",  hatch='xx',
                       label='3GPP C-V2X', kind="bar", edgecolor='black',width=0.4,)
     df_pdr_merged.plot( position=0,x="Distance", color='r', y="mean_y",yerr="std_y",  hatch='oo',
@@ -105,9 +115,19 @@ def plots():
     plt.xticks(rotation=360)
     ax.set_ylabel('PDR [%]')
     ax.set_xlabel('Distance [m]')
-    #ax.set_xticks([100,200,300,400,500,600,700,800])
-    plt.xlim(-1, 8)
-    #fig.tight_layout()
+    plt.xlim(-1, 5)
+    plt.show()
+
+
+    # Subplots DELAY with several columns
+    ax = df_delay_merged.plot(position=1,x="Distance", color='b', y="mean_x", yerr="std_x",  hatch='xx',
+                      label='3GPP C-V2X', kind="bar", edgecolor='black',width=0.4,)
+    df_delay_merged.plot( position=0,x="Distance", color='r', y="mean_y",yerr="std_y",  hatch='oo',
+                           label='IEEE802.11p', kind="bar", ax=ax, edgecolor='black',width=0.4,)
+    plt.xticks(rotation=360)
+    ax.set_ylabel('Latency [ms]')
+    ax.set_xlabel('Distance [m]')
+    plt.xlim(-1, 5)
     plt.show()
 
 
