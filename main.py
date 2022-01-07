@@ -1,10 +1,8 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-import os
-import matplotlib.colors as mcolors
-import matplotlib as mpl
-from matplotlib.ticker import MaxNLocator
+import numpy as np
+import pandas as pd
 from matplotlib import rc
 import matplotlib.ticker as mtick
 plt.rcParams.update({'font.size': 18})
