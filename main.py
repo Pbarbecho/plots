@@ -1,10 +1,15 @@
-import pandas as pd
-import numpy as np
+import os
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from matplotlib import rc
-import matplotlib.ticker as mtick
+from matplotlib.ticker import FuncFormatter
+from scipy.interpolate import interp1d
+import seaborn as sns
+
+
+
 plt.rcParams.update({'font.size': 18})
 rc('font',**{'family':'sans-serif','sans-serif':['Helvetica']})
 rc('text', usetex=False)
@@ -12,7 +17,7 @@ rc('text', usetex=False)
 
 def filter_by_distance(df):
     space = 100 # distance space in x axis
-    max_distance = 500 # max distance of rrx message
+    max_distance = 600 # max distance of rrx message
     iterations = max_distance / space
     distances_df = pd.DataFrame()
     for iter in range(int(iterations)):
@@ -86,9 +91,6 @@ def read_data_cv2x():
     df_merged.dropna(inplace=True)
     df_delay_filtered_dist = filter_by_distance(df_merged)
     df_delay = filter_group(df_delay_filtered_dist, 'Delay')
-    print('CV2X Mean Delay:', df_delay['mean'].mean())
-    print('CV2X Mean PDR:', df_pdr['mean'].mean())
-    print('CV2X STD PDR:', df_pdr['std'].mean())
     return df_pdr,df_delay
 
 
@@ -113,7 +115,7 @@ def plots():
     plt.xticks(rotation=360)
     ax.set_ylabel('PDR [%]')
     ax.set_xlabel('Distance [m]')
-    plt.xlim(-1, 5)
+    plt.xlim(-1, 6)
     plt.show()
 
 
@@ -125,7 +127,7 @@ def plots():
     plt.xticks(rotation=360)
     ax.set_ylabel('Latency [ms]')
     ax.set_xlabel('Distance [m]')
-    plt.xlim(-1, 5)
+    plt.xlim(-1, 6)
     plt.show()
 
 
@@ -260,4 +262,408 @@ def single_plot(folders, df):
     #fig.savefig(fig_folder)
 
 
-plots()
+def read_tripinfo_file_TL():
+    "Read data coming from OMNET simulations and build dataframes"
+    p_emissions = "/Users/Pablo/Desktop/RL/plots/energy/rl/tripinfo.xml.csv"
+    o_emissions = "/Users/Pablo/Desktop/RL/plots/energy/norl/tripinfo.xml.csv"
+
+
+
+
+    p_emissions_df = pd.read_csv(p_emissions)
+    o_emissions_df = pd.read_csv(o_emissions)
+
+    p_emissions_df = p_emissions_df.loc[p_emissions_df['tripinfo_id'] == 'leader']
+    print(p_emissions_df.keys())
+    p_emissions_df = p_emissions_df.filter(
+        items=["emissions_NOx_abs","tripinfo_timeLoss", "tripinfo_vType", "tripinfo_routeLength", "tripinfo_duration",
+               "tripinfo_waitingTime", "emissions_CO2_abs", "emissions_fuel_abs"])
+
+    o_emissions_df = o_emissions_df.loc[o_emissions_df['tripinfo_id'] == 'leader']
+    o_emissions_df = o_emissions_df.filter(
+        items=["emissions_NOx_abs","tripinfo_timeLoss", "tripinfo_vType", "tripinfo_routeLength", "tripinfo_duration",
+               "tripinfo_waitingTime", "emissions_CO2_abs", "emissions_fuel_abs"])
+
+    return pd.merge(p_emissions_df, o_emissions_df, suffixes=('_p', '_o'), on='tripinfo_vType',
+                         how='outer').replace(np.nan, 0).reset_index()
+
+
+
+def emissions():
+    "Read data coming from OMNET simulations and build dataframes"
+    p_emissions = "/Users/Pablo/Desktop/RESULT/predict/emission.xml.csv"
+    o_emissions = "/Users/Pablo/Desktop/RESULT/original/emission.xml.csv"
+
+    p_emissions_df = pd.read_csv(p_emissions)
+    o_emissions_df = pd.read_csv(o_emissions)
+
+    p_emissions_df = p_emissions_df.loc[p_emissions_df['vehicle_id']=='leader']
+    p_emissions_df = p_emissions_df.filter(items=["vehicle_electricity","timestep_time", "vehicle_CO2", "vehicle_NOx", "vehicle_fuel", "vehicle_speed"])
+
+    o_emissions_df = o_emissions_df.loc[o_emissions_df['vehicle_id'] == 'leader']
+    o_emissions_df = o_emissions_df.filter(items=["vehicle_electricity","timestep_time", "vehicle_CO2", "vehicle_NOx", "vehicle_fuel", "vehicle_speed"])
+
+    df_merged = pd.merge(p_emissions_df, o_emissions_df, suffixes=('_p', '_o'), on='timestep_time', how='outer').replace(np.nan, 0).reset_index()
+
+    fig, axes = plt.subplots(figsize=(8, 5))
+
+    # CO2
+    #df_merged.plot.line(subplots=True, grid=False,ax=axes,color='red',x='timestep_time',y='vehicle_CO2_o', label='No prediction')
+    #df_merged.plot.line(subplots=True, grid=False,ax=axes,color='green', x='timestep_time',y='vehicle_CO2_p',label='Prediction')
+
+    # NOX
+    print(df_merged.keys())
+
+    df_merged.plot.line(subplots=True, grid=False,ax=axes,color='red',x='timestep_time',y='vehicle_NOx_o', label='No prediction')
+    df_merged.plot.line(subplots=True, grid=False,ax=axes,color='green', x='timestep_time',y='vehicle_NOx_p',label='Prediction')
+
+    axes.set_ylabel(r'NOx [mg/s]')
+    axes.set_xlabel(r'Time [s]')
+    #axes.set_title('CO2 emissions')
+    plt.show()
+
+    fig, axes = plt.subplots(figsize=(8, 5))
+    df_merged.plot.line(subplots=True, grid=False, ax=axes, color='red', x='timestep_time', y='vehicle_speed_o', label='No prediction')
+    df_merged.plot.line(subplots=True, grid=False, ax=axes, color='green', x='timestep_time', y='vehicle_speed_p',label='Prediction')
+    axes.set_ylabel(r'Speed [m/s]')
+    axes.set_xlabel(r'Time [s]')
+    # axes.set_title('CO2 emissions')
+    plt.show()
+
+def triptime(df_merged):
+    # Setting the positions and width for the bars
+    pos = list(range(2))
+    width = 0.2  # the width of a bar
+
+    # Plotting the bars
+    fig, ax = plt.subplots(figsize=(8, 5))
+
+    plt.bar(0, df_merged['tripinfo_duration_p'], width,
+            alpha=1,
+            color='green',
+            hatch='x',  # this one defines the fill pattern
+            label="Prediction",
+            edgecolor='black')
+
+    plt.bar(0.2, df_merged['tripinfo_duration_o'], width,
+            alpha=1,
+            color='red',
+            hatch='o',
+            label="No prediction",
+            edgecolor='black')
+
+    #ax2 = ax.twinx()  # instantiate a second axes that shares the same x-axis
+    plt.bar(0.5, df_merged['tripinfo_timeLoss_p'], width,
+            alpha=1,
+            color='green',
+            hatch='x',  # this one defines the fill pattern
+            label="Prediction",
+            edgecolor='black')
+
+    plt.bar(0.7, df_merged['tripinfo_timeLoss_o'], width,
+            alpha=1,
+            color='red',
+            hatch='o',
+            label="No prediction",
+            edgecolor='black')
+
+    plt.bar(1, df_merged['tripinfo_waitingTime_p'] , width,
+            alpha=1,
+            color='green',
+            hatch='x',  # this one defines the fill pattern
+            label="Prediction",
+            edgecolor='black')
+
+    plt.bar(1.2, df_merged['tripinfo_waitingTime_o'], width,
+            alpha=1,
+            color='red',
+            hatch='o',
+            label="No prediction",
+            edgecolor='black')
+    ax.set_xticks( [0.1,0.6,1.1], ['Trip Duration', 'Timeloss','Waiting Time'])
+    ax.set_ylabel(r'Time [s]')
+    ax.legend(['Prediction', 'No Prediction'], loc='lower center', bbox_to_anchor=(0.5, 1.05),
+              ncol=3, fancybox=True, shadow=True)
+    plt.show()
+
+
+def emissions_summary(df_merged):
+# Setting the positions and width for the bars
+    pos = list(range(2))
+    width = 0.2  # the width of a bar
+
+    # Plotting the bars
+    fig, ax = plt.subplots(figsize=(8, 5))
+    print(df_merged.keys())
+    plt.bar(0, df_merged['emissions_NOx_abs_p'], width,
+           alpha=1,
+           color='green',
+           hatch='x',  # this one defines the fill pattern
+           label="Prediction",
+           edgecolor='black')
+
+    plt.bar(0.2, df_merged['emissions_NOx_abs_o'], width,
+               alpha=1,
+               color='red',
+               hatch='o',
+               label="No prediction",
+               edgecolor='black')
+
+
+    plt.bar(0.5, df_merged['emissions_CO2_abs_p']/1000, width,
+               alpha=1,
+               color='green',
+               hatch='x',  # this one defines the fill pattern
+               label="Prediction",
+               edgecolor='black')
+
+    plt.bar(0.7, df_merged['emissions_CO2_abs_o']/1000, width,
+               alpha=1,
+               color='red',
+               hatch='o',
+               label="No prediction",
+               edgecolor='black')
+    ax2 = ax.twinx()  # instantiate a second axes that shares the same x-axis
+    plt.bar(1, df_merged['emissions_fuel_abs_p'] , width,
+               alpha=1,
+               color='green',
+               hatch='x',  # this one defines the fill pattern
+               label="Prediction",
+               edgecolor='black')
+
+    plt.bar(1.2, df_merged['emissions_fuel_abs_o'] , width,
+               alpha=1,
+               color='red',
+               hatch='o',
+               label="No prediction",
+               edgecolor='black')
+
+    ax.set_xticks( [0.1,0.6,1.1], ['NOx', 'CO2','Fuel'])
+    ax.set_ylabel(r'Emissions [ug]')
+    ax2.set_ylabel(r'Fuel consumption [ml]')
+    ax.legend(['Prediction', 'No Prediction'], loc='lower center', bbox_to_anchor=(0.5, 1.05),
+              ncol=3, fancybox=True, shadow=True)
+    plt.show()
+
+def ev(df_merged):
+    # Setting the positions and width for the bars
+    pos = list(range(2))
+    width = 0.2  # the width of a bar
+
+    # Plotting the bars
+    fig, ax = plt.subplots(figsize=(8, 5))
+    print(df_merged.keys())
+    plt.bar(0, df_merged['vehicle_electricity_p'], width,
+            alpha=1,
+            color='green',
+            hatch='x',  # this one defines the fill pattern
+            label="Prediction",
+            edgecolor='black')
+
+    plt.bar(0.2, df_merged['vehicle_electricity_o'], width,
+            alpha=1,
+            color='red',
+            hatch='o',
+            label="No prediction",
+            edgecolor='black')
+
+
+    ax.set_xticks( [0.1,0.6,1.1], ['Trip Duration', 'Timeloss','Waiting Time'])
+    ax.set_ylabel(r'Time [s]')
+    ax.legend(['Prediction', 'No Prediction'], loc='lower center', bbox_to_anchor=(0.5, 1.05),
+              ncol=3, fancybox=True, shadow=True)
+    plt.show()
+
+
+def millions(x, pos):
+    'The two args are the value and tick position'
+    return '%1.0fk' % (x*1e-3)
+
+
+
+def plot_train_logs():
+    #path_log_csv = "/Users/Pablo/Desktop/RL/plots/logs/train_value_loss_150k.csv"
+
+    path_log_csv = "/Users/Pablo/Desktop/RL/plots/model/plots/train_value_loss.csv"
+    value_loss_df = pd.read_csv(path_log_csv)
+    formatter = FuncFormatter(millions)
+
+    fig, axes = plt.subplots(figsize=(6, 4))
+    value_loss_df.plot.line(subplots=True, grid=False, ax=axes, color='green', x='Step', y='Value')
+    axes.get_legend().remove()
+    axes.xaxis.set_major_formatter(formatter)
+    axes.set_ylabel(r'Value Loss')
+    axes.set_xlabel(r'Training Steps')
+    fig.tight_layout()
+    plt.show()
+
+    ev_path_log_csv = "/Users/Pablo/Desktop/RL/plots/model/plots/train_explained_variance.csv"
+    ev_df = pd.read_csv(ev_path_log_csv)
+
+    fig, axes = plt.subplots(figsize=(6, 4))
+    ev_df.plot.line(subplots=True, grid=False, ax=axes, color='green', x='Step', y='Value')
+    axes.get_legend().remove()
+    axes.xaxis.set_major_formatter(formatter)
+    axes.set_ylabel(r'Explained Variance')
+    axes.set_xlabel(r'Training Steps')
+    fig.tight_layout()
+    plt.show()
+
+
+def plot_distance():
+    rl_path_file = "/Users/Pablo/Desktop/RL/plots/distance/rl.csv"
+    rl_distance_df = pd.read_csv(rl_path_file, names=['Distance', 'Time'])
+
+    no_path_file = "/Users/Pablo/Desktop/RL/plots/distance/norl.csv"
+    no_distance_df = pd.read_csv(no_path_file, names=['Distance', 'Time'])
+
+    #df_merged = pd.merge(rl_path_file, o_emissions_df, suffixes=('_p', '_o'), on='timestep_time', how='outer').replace(np.nan, 0).reset_index()
+
+    fig, axes = plt.subplots(figsize=(8, 5))
+    no_distance_df.plot.line(subplots=True, grid=False,ax=axes,color='red',x='Time',y='Distance', label='No prediction')
+    rl_distance_df.plot.line(subplots=True, grid=False,ax=axes,color='green', x='Time',y='Distance',label='Prediction')
+
+    axes.set_ylabel(r'Distance to TL [m]')
+    axes.set_xlabel(r'Time [s]')
+    #axes.set_title('CO2 emissions')
+
+    plt.show()
+
+
+def plot_reward():
+    path_10k_file = "/Users/Pablo/Desktop/RL/plots/model/10k/reward.csv"
+    df_10k = pd.read_csv(path_10k_file, names=['Reward', 'Penalty', 'Time'])
+
+    path_100k_file = "/Users/Pablo/Desktop/RL/plots/model/100k/reward.csv"
+    df_100k = pd.read_csv(path_100k_file, names=['Reward', 'Penalty', 'Time'])
+    """
+    fig, axes = plt.subplots(figsize=(8, 5))
+    df_10k.plot.line(subplots=True, grid=False, ax=axes, color='red', x='Time', y='Reward',
+                             label='No prediction')
+    df_100k.plot.line(subplots=True, grid=False, ax=axes, color='green', x='Time', y='Reward',
+                     label='prediction')
+
+
+    axes.set_ylabel(r'PPO Max Reward')
+    axes.set_xlabel(r'Time [s]')
+    # axes.set_title('CO2 emissions')
+    #plt.show()
+    """
+    sns.lineplot(x="Time", y="Reward", data=df_100k)
+    sns.lineplot(x="Time", y="Reward", data=df_10k)
+    plt.show()
+
+def plot_total_energy():
+    path_energy_file_rl = "/Users/Pablo/Desktop/RL/plots/energy/rl/modelrl.csv"
+    energy_rl_df = pd.read_csv(path_energy_file_rl)
+    energy_rl_df = energy_rl_df.filter(items=['vehicle_acceleration', 'timestep_time','vehicle_energyConsumed',  'vehicle_id', 'vehicle_maximumBatteryCapacity', 'vehicle_speed', 'vehicle_timeStopped', 'vehicle_energyCharged'])
+    energy_rl_df.dropna(inplace=True)
+
+    print(energy_rl_df.keys())
+    path_energy_file_no_rl = "/Users/Pablo/Desktop/RL/plots/energy/norl/norl.csv"
+    energy_no_rl_df = pd.read_csv(path_energy_file_no_rl)
+    energy_no_rl_df = energy_no_rl_df.filter(items=['vehicle_acceleration','timestep_time','vehicle_energyConsumed',  'vehicle_id', 'vehicle_maximumBatteryCapacity', 'vehicle_speed', 'vehicle_timeStopped', 'vehicle_energyCharged'])
+    energy_no_rl_df.dropna(inplace=True)
+
+    df_merged = pd.merge(energy_rl_df, energy_no_rl_df, suffixes=('_p', '_o'), on='timestep_time',
+                    how='outer').replace(np.nan, 0).reset_index()
+
+    df_merged = df_merged.filter(items=['vehicle_timeStopped_p', 'vehicle_timeStopped_o','vehicle_energyConsumed_p','vehicle_energyConsumed_o','vehicle_speed_o','vehicle_speed_p'])
+
+    num_rows = df_merged.shape[0]
+    total_df =  df_merged.sum()
+
+
+
+    df_merged.to_csv('/Users/Pablo/Desktop/RL/plots/energy/merged.csv')
+
+    pos = list(range(2))
+    width = 0.2  # the width of a bar
+
+    # Plotting the bars
+    fig, ax = plt.subplots(figsize=(8, 5))
+    print(df_merged.keys())
+    plt.bar(0, total_df['vehicle_energyConsumed_p'], width,
+            alpha=1,
+            color='green',
+            hatch='x',  # this one defines the fill pattern
+            label="Prediction",
+            edgecolor='black')
+
+    plt.bar(0.2, total_df['vehicle_energyConsumed_o'], width,
+            alpha=1,
+            color='red',
+            hatch='o',
+            label="No prediction",
+            edgecolor='black')
+    ax2 = ax.twinx()  # instantiate a second axes that shares the same x-axis
+    plt.bar(0.6, total_df['vehicle_speed_p']/num_rows , width,
+            alpha=1,
+            color='green',
+            hatch='x',  # this one defines the fill pattern
+            label="Prediction",
+            edgecolor='black')
+
+    plt.bar(0.8, total_df['vehicle_speed_o']/num_rows , width,
+            alpha=1,
+            color='red',
+            hatch='o',
+            label="No prediction",
+            edgecolor='black')
+
+    ax.set_xticks([0.1, 0.7], ['', ''])
+    ax.set_ylabel(r'Total energy consumption [Wh]')
+    ax2.set_ylabel(r'Mean speed [m/s]')
+    ax.legend(['Prediction', 'No Prediction'], loc='lower center', bbox_to_anchor=(0.5, 1.05),
+              ncol=3, fancybox=True, shadow=True)
+    plt.show()
+
+
+def plot_energy():
+    path_energy_file_rl = "/Users/Pablo/Desktop/RL/plots/energy/rl/modelrl.csv"
+    energy_rl_df = pd.read_csv(path_energy_file_rl)
+    print(energy_rl_df.keys())
+    energy_rl_df = energy_rl_df.filter(items=['vehicle_acceleration', 'timestep_time','vehicle_energyConsumed',  'vehicle_id', 'vehicle_maximumBatteryCapacity', 'vehicle_speed', 'vehicle_timeStopped'])
+    energy_rl_df.dropna(inplace=True)
+
+
+    path_energy_file_no_rl = "/Users/Pablo/Desktop/RL/plots/energy/norl/norl.csv"
+    energy_no_rl_df = pd.read_csv(path_energy_file_no_rl)
+    energy_no_rl_df = energy_no_rl_df.filter(items=['vehicle_acceleration','timestep_time','vehicle_energyConsumed',  'vehicle_id', 'vehicle_maximumBatteryCapacity', 'vehicle_speed', 'vehicle_timeStopped'])
+    energy_no_rl_df.dropna(inplace=True)
+
+
+    fig, axes = plt.subplots(figsize=(8, 5))
+    energy_rl_df.plot.line(subplots=True, grid=False,ax=axes,color='green',x='timestep_time',y='vehicle_speed', label='Prediction')
+    energy_no_rl_df.plot.line(subplots=True, grid=False, ax=axes, color='red', x='timestep_time', y='vehicle_speed',
+                           label='No Prediction')
+    #energy_rl_df.plot.line(subplots=True, grid=False,ax=axes,color='red',x='timestep_time',y='vehicle_energyConsumed', label='Prediction')
+    #rl_distance_df.plot.line(subplots=True, grid=False,ax=axes,color='green', x='Time',y='Distance',label='Prediction')
+
+    #axes.set_ylabel(r'Energy consumption [Wh]')
+    axes.set_ylabel(r'Speed [m/s]')
+    axes.set_xlabel(r'Time [s]')
+    #axes.set_title('CO2 emissions')
+    plt.show()
+
+#plot_total_energy()
+#plot_energy()  # plot speed, consumption
+
+#df_merged = read_tripinfo_file_TL()
+#triptime(df_merged)
+
+"""
+emissions()
+df_merged = read_tripinfo_file_TL()
+triptime(df_merged)
+emissions_summary(df_merged)
+
+plot_train_logs()
+
+
+#plot_reward()
+
+"""
+
+
+plot_distance()
