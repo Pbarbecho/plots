@@ -780,37 +780,59 @@ def plot_summary_file(path_summary_file):
     plt.show()
 
 
-def plot_generic_fundamental_statistics(list_of_agg_dfs, y,factor,ylabel):
-    # DATA
-    a_25, a_50, a_75, a_100 = list_of_agg_dfs[0], list_of_agg_dfs[1], list_of_agg_dfs[2], list_of_agg_dfs[3]
+def time_plot_generic_fundamental_statistics(ld,hd,a,b,c,factor,ylabel):
+    # PLOT TRIP TIME FOR DIFERENT DENSITIES
+    width = 0.1
+    # Plotting the bars
+    fig, ax = plt.subplots(figsize=(6, 4))
+    x = [0.0,0.1,0.2,0.5,0.6,0.7]
+    # low density
+    plt.bar(x[0], np.mean(ld[a] / factor), yerr=np.std(ld[a] / factor), width=width,align='center', alpha=0.5, ecolor='black', capsize=10, color='red', hatch='o', label='Trip Duration',edgecolor='black')
+    plt.bar(x[1], np.mean(ld[b] / factor), yerr=np.std(ld[b] / factor), width=width,align='center', alpha=0.5, ecolor='black', capsize=10, color='green', hatch='-', label='Waiting Time',edgecolor='black')
+    plt.bar(x[2], np.mean(ld[c] / factor), yerr=np.std(ld[c] / factor), width=width, align='center', alpha=0.5, ecolor='black', capsize=10, color='gray', hatch='x', label='Time Loss', edgecolor='black')
+    # high density
+    plt.bar(x[3], np.mean(hd[a] / factor), yerr=np.std(hd[a] / factor), width=width, align='center', alpha=0.5,ecolor='black', capsize=10, color='red', hatch='o', label='Trip Duration', edgecolor='black')
+    plt.bar(x[4], np.mean(hd[b] / factor), yerr=np.std(hd[b] / factor), width=width, align='center', alpha=0.5,ecolor='black', capsize=10, color='green', hatch='-', label='Waiting Time', edgecolor='black')
+    plt.bar(x[5], np.mean(hd[c] / factor), yerr=np.std(hd[c] / factor), width=width, align='center', alpha=0.5,ecolor='black', capsize=10, color='gray', hatch='x', label='Time Loss', edgecolor='black')
+
+    ax.set_xticks([0.1,0.6], ['Low Density','High Density'])
+    ax.set_ylabel(ylabel)
+    ax.legend()
+    plt.tight_layout()
+    plt.savefig(f'/Users/Pablo/Dropbox/Mac/Documents/PROYECTO_SUMO/DATA/plots/time_stat.pdf')
+
+
+def plot_generic_fundamental_statistics(ld,hd,y,factor,ylabel):
     # PLOT TRIP TIME FOR DIFERENT DENSITIES
     width = 0.1
     # Plotting the bars
     fig, ax = plt.subplots(figsize=(6, 4))
     x = [0.0, 0.2]
-    plt.bar(x[0], np.mean(a_50[y] / factor), yerr=np.std(a_50[y] / factor), width=width,align='center', alpha=0.5, ecolor='black', capsize=10, color='red', hatch='o', label='Low Density',edgecolor='black')
-    plt.bar(x[1], np.mean(a_50[y] / factor), yerr=np.std(a_50[y] / factor), width=width,align='center', alpha=0.5, ecolor='black', capsize=10, color='green', hatch='-', label='Peak Hour',edgecolor='black')
-    ax.set_xticks(x, [])
+    plt.barh(x[0], np.mean(ld[y] / factor), yerr=np.std(ld[y] / factor), width=width,align='center', alpha=0.5, ecolor='black', capsize=10, color='red', hatch='o', label='Low Density',edgecolor='black')
+    plt.barh(x[1], np.mean(hd[y] / factor), yerr=np.std(hd[y] / factor), width=width,align='center', alpha=0.5, ecolor='black', capsize=10, color='green', hatch='-', label='High Density',edgecolor='black')
+    ax.set_yticks(x, [])
     ax.set_ylabel(ylabel)
     ax.legend()
     plt.tight_layout()
-    plt.show()
+    plt.savefig(f'/Users/Pablo/Dropbox/Mac/Documents/PROYECTO_SUMO/DATA/plots/distance_stat.pdf')
 
 
-def plot_tripinfo_file(list_dfs_tripinfo):
+def plot_tripinfo_file(list_dfs_tripinfo_LD,list_dfs_tripinfo_HD):
     # READ DATA
     filter_items = ["emissions_NOx_abs", "tripinfo_timeLoss", "tripinfo_vType", "tripinfo_routeLength", "tripinfo_duration",
                     "tripinfo_waitingTime", "emissions_CO2_abs", "emissions_fuel_abs", 'emissions_electricity_abs','tripinfo_vType','tripinfo_depart']
-    list_of_agg_dfs = filter_function(list_dfs_tripinfo, filter_items)
+    list_of_agg_dfs_LD = filter_function(list_dfs_tripinfo_LD, filter_items)
+    list_of_agg_dfs_HD = filter_function(list_dfs_tripinfo_HD, filter_items)
 
     # DATA
-    a_25, a_50, a_75, a_100 = list_of_agg_dfs[0], list_of_agg_dfs[1], list_of_agg_dfs[2], list_of_agg_dfs[3]
+    a_25_ld, a_50_ld, a_75_ld, a_100_ld = list_of_agg_dfs_LD[0], list_of_agg_dfs_LD[1], list_of_agg_dfs_LD[2], list_of_agg_dfs_LD[3]
+    a_25_hd, a_50_hd, a_75_hd, a_100_hd = list_of_agg_dfs_HD[0], list_of_agg_dfs_HD[1], list_of_agg_dfs_HD[2], list_of_agg_dfs_HD[3]
 
     # TODOS LOS PLOTS SON DE 50% PENETRATION
     #plot trip time [min]
-    plot_generic_fundamental_statistics(list_of_agg_dfs,'tripinfo_duration',60,'Mean Trip Duration [min]')
+    #time_plot_generic_fundamental_statistics(a_25_ld,a_25_hd,'tripinfo_duration','tripinfo_waitingTime','tripinfo_timeLoss',60,'Time [min]')
     # plot route length [km]
-    plot_generic_fundamental_statistics(list_of_agg_dfs, 'tripinfo_routeLength', 1000, 'Mean Router Length [km]')
+    #plot_generic_fundamental_statistics(a_25_ld,a_25_hd, 'tripinfo_routeLength', 1000, 'Mean Router Length [km]')
 
 
 def filter_function(list_of_df, filter_list):
@@ -821,7 +843,7 @@ def filter_function(list_of_df, filter_list):
     return list_filtered_df
 
 
-def count_total_vehicles_emissions(list_df_emissions):
+def count_total_vehicles_emissions(list_df_emissions,density):
     # filtramos emissions file
     filter_items = ['timestep_time', 'vehicle_id', 'vehicle_type']
     list_of_filtered_dfs = filter_function(list_df_emissions, filter_items)
@@ -981,8 +1003,8 @@ def count_total_vehicles_emissions(list_df_emissions):
     ax.set_xticks( [0.15,0.65, 1.15], ['GAS', 'EVs', 'Total Vehicles'])
     ax.set_ylabel(r'# of vehicles')
     ax.legend(loc='lower center', bbox_to_anchor = (0.5, 1.0), ncol=2, fancybox=True, shadow=False)
-    #plt.tight_layout()
-    plt.show()
+    plt.tight_layout()
+    plt.savefig(f'/Users/Pablo/Dropbox/Mac/Documents/PROYECTO_SUMO/DATA/plots/{density}_tot_veh.pdf')
 
 
 def count_vehicles_emissions(path_emissions_file):
@@ -1014,7 +1036,7 @@ def count_vehicles_emissions(path_emissions_file):
     plt.show()
 
 
-def plots_instantaneous_emissions_generic(list_of_agg_dfs,x,y,ylabel):
+def plots_instantaneous_emissions_generic(density, list_of_agg_dfs,x,y,ylabel):
     #DATA
     a_25, a_50, a_75, a_100 = list_of_agg_dfs[0], list_of_agg_dfs[1], list_of_agg_dfs[2], list_of_agg_dfs[3]
     l25, l50, l75, l100 = "25% EV's Penetration", "50% EV's Penetration", "75% EV's Penetration", "100% EV's Penetration"
@@ -1027,10 +1049,11 @@ def plots_instantaneous_emissions_generic(list_of_agg_dfs,x,y,ylabel):
     a_100.plot.line(subplots=True,grid=False, ax=axes, color='green', x=x, y=y, label=l100)
     axes.set_ylabel(ylabel)
     axes.set_xlabel(r'Time [min]')
-    plt.show()
+    plt.tight_layout()
+    plt.savefig(f'/Users/Pablo/Dropbox/Mac/Documents/PROYECTO_SUMO/DATA/plots/{density}_inst_{y}.pdf')
 
 
-def plots_total_emissions_generic(list_of_agg_dfs,y,ylabel,factor):
+def plots_total_emissions_generic(density, list_of_agg_dfs,y,ylabel,factor):
     #DATA
     a_25, a_50, a_75, a_100 = list_of_agg_dfs[0], list_of_agg_dfs[1], list_of_agg_dfs[2], list_of_agg_dfs[3]
     l25, l50, l75, l100 = "25% EV's Penetration", "50% EV's Penetration", "75% EV's Penetration", "100% EV's Penetration"
@@ -1048,10 +1071,10 @@ def plots_total_emissions_generic(list_of_agg_dfs,y,ylabel,factor):
     ax.set_ylabel(ylabel)
     ax.legend()
     plt.tight_layout()
-    plt.show()
+    plt.savefig(f'/Users/Pablo/Dropbox/Mac/Documents/PROYECTO_SUMO/DATA/plots/{density}_tot_{y}.pdf')
 
 
-def plot_emissions_file(list_df_emissions):
+def plot_emissions_file(list_df_emissions,density):
     # filtramos emissions file
     filter_items = ['timestep_time',"vehicle_CO2","vehicle_NOx",'vehicle_fuel','vehicle_eclass','vehicle_electricity','vehicle_speed']
     list_of_filtered_dfs = filter_function(list_df_emissions, filter_items)
@@ -1084,23 +1107,23 @@ def plot_emissions_file(list_df_emissions):
 
     # Instantaneous PLOTS
     # PLOT  CO2[g]
-    plots_instantaneous_emissions_generic(list_of_agg_dfs,'time_min','vehicle_CO2_g',r'CO$_{2}$ [g]')
+    plots_instantaneous_emissions_generic(density, list_of_agg_dfs,'time_min','vehicle_CO2_g',r'CO$_{2}$ [g]')
     # PLOT  NOX [mg]
-    plots_instantaneous_emissions_generic(list_of_agg_dfs, 'time_min', 'vehicle_NOx', 'NOx [mg]')
+    plots_instantaneous_emissions_generic(density, list_of_agg_dfs, 'time_min', 'vehicle_NOx', 'NOx [mg]')
     # PLOT  fuel [kL]
-    plots_instantaneous_emissions_generic(list_of_agg_dfs, 'time_min', 'vehicle_fuel_l', 'Fuel consumption [L]')
+    plots_instantaneous_emissions_generic(density, list_of_agg_dfs, 'time_min', 'vehicle_fuel_l', 'Fuel consumption [L]')
     # PLOT  energy consumption [kWh]
-    plots_instantaneous_emissions_generic(list_of_agg_dfs, 'time_min', 'vehicle_electricity_kwh', 'Battery Energy Consumption [kWh]')
+    plots_instantaneous_emissions_generic(density, list_of_agg_dfs, 'time_min', 'vehicle_electricity_kwh', 'Battery Energy Consumption [kWh]')
 
     # Totalized PLOTS
     # PLOT  CO2[t]
-    plots_total_emissions_generic(list_of_agg_dfs_total,'vehicle_CO2_g','CO$_{2}$ [t]',1e6) #medimos en kg el total
+    plots_total_emissions_generic(density, list_of_agg_dfs_total,'vehicle_CO2_g','CO$_{2}$ [t]',1e6) #medimos en kg el total
     # PLOT  NOx[g]
-    plots_total_emissions_generic(list_of_agg_dfs_total,'vehicle_NOx','NOx [t]',1e6) #medimos en kg el total
+    plots_total_emissions_generic(density, list_of_agg_dfs_total,'vehicle_NOx','NOx [t]',1e6) #medimos en kg el total
     # PLOT  CO2[g]
-    plots_total_emissions_generic(list_of_agg_dfs_total,'vehicle_fuel_l','Fuel consumption [kL]',1e3) #medimos en kg el total
+    plots_total_emissions_generic(density, list_of_agg_dfs_total,'vehicle_fuel_l','Fuel consumption [kL]',1e3) #medimos en kg el total
     # PLOT  energy [kWh]
-    plots_total_emissions_generic(list_of_agg_dfs_total, 'vehicle_electricity_kwh', 'Battery Energy Consumption [MWh]',1e3)  # medimos en kg el total
+    plots_total_emissions_generic(density, list_of_agg_dfs_total, 'vehicle_electricity_kwh', 'Battery Energy Consumption [MWh]',1e3)  # medimos en kg el total
 
 
 def read_data(general_path):
@@ -1140,19 +1163,25 @@ def read_data(general_path):
 
 # READ SUMO OUTPUT FILES
 general_path = '/Users/Pablo/Dropbox/Mac/Documents/PROYECTO_SUMO/DATA/HD'
-dict = read_data(general_path)
+dict_HD = read_data(general_path)
+
+general_path = '/Users/Pablo/Dropbox/Mac/Documents/PROYECTO_SUMO/DATA/LD'
+dict_LD = read_data(general_path)
 
 # Plot the number of running vehicles at each simulation time
 #plot_summary_file(os.path.join(general_path,'origin_destination_summary_0.csv'))
 
 # SI - Plot traffic statistics - FALTA OTRA DENSIDAD MAS ALTA PARA COMPARAR
-#plot_tripinfo_file(dict['tripinfo'])
-
+#plot_tripinfo_file(dict_LD['tripinfo'],dict_HD['tripinfo'])
+print('End PLOT 1')
 # SI - Plot time evolution emissions, fuel
-#plot_emissions_file(dict['emissions'])
-
+plot_emissions_file(dict_LD['emissions'],'LD')
+plot_emissions_file(dict_HD['emissions'],'HD')
+print('End PLOT 2')
 # NO - cuenta el numero de ev o gas vehicles durante el tiempo
 #count_vehicles_emissions(os.path.join(general_path,'origin_destination_emission_0.csv'))
 
 # SI - cuenta el numero total de ev o gas vehicles
-#count_total_vehicles_emissions(dict['emissions'])
+count_total_vehicles_emissions(dict_LD['emissions'],'LD')
+count_total_vehicles_emissions(dict_HD['emissions'],'HD')
+print('End PLOT 3')
